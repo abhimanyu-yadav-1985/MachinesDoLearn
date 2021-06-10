@@ -1,246 +1,254 @@
-import dash
-import dash_bootstrap_components as dbc
-import dash_html_components as html
-import dash_core_components as dcc
-from dash.dependencies import Input, Output, State
-import pyodbc
-import os
-import numpy as np
 import pandas as pd
-import pprint
 
-#-----------------------------------------------------
-#Databae connection
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import dash_bootstrap_components as dbc
+import dash_trich_components as dtc
 
-def get_database_connection():
-    server = os.environ['DB_SERVER'] 
-    database = os.environ['DB_NAME']
-    username = os.environ['DB_USER']
-    password = os.environ['DB_PASSWD']
-    #print(os.environ['PATH'])
-    cnxn_string = 'DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password
-    cnxn = pyodbc.connect(cnxn_string)
-    cursor = cnxn.cursor()
-    
-    return cnxn, cursor
+from dash.dependencies import Output, Input
 
-cnxn, cursor = get_database_connection()
+import yaml
+import urllib
+import os
 
-#-------------------------------------------
-# Databae functions
+CARD_PATH = os.environ['CARD_PATH']
+STACK_PATH = os.environ['STACK_PATH']
+ABOUT_PATH = os.environ['ABOUT_PATH']
 
-def get_page_list():
-    
-    query = 'SELECT * FROM [PAGES]'
-    out =  np.asarray(pd.read_sql(query, cnxn)['TITLE'])
-    return out
+card_data = yaml.safe_load(urllib.request.urlopen(CARD_PATH))
+stacks_data = yaml.safe_load(urllib.request.urlopen(STACK_PATH))
+about_data = yaml.safe_load(urllib.request.urlopen(ABOUT_PATH))
 
+external_stylesheets = [
+    dbc.themes.FLATLY,
+    'https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css',
+    'https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;700&display=swap',
+    'https://fonts.googleapis.com/css2?family=Squada+One&display=swap',
+    'https://use.fontawesome.com/releases/v5.8.1/css/all.css']
 
+external_scripts = [
+    'https://code.jquery.com/jquery-3.5.1.min.js',
+    'https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js']
 
-def get_page_tag_list(page):
-    query = f"SELECT * FROM PAGE_TAG WHERE PAGE = '{page}'"
-    out= np.asarray(pd.read_sql(query, cnxn)['TAG'])
-    return out
-
-
-def get_page_card_list(page):
-    query = f"SELECT * FROM PAGE_CARD WHERE PAGE = '{page}'"
-    out = np.asarray(pd.read_sql(query, cnxn)['CARD'])
-    return out
-
-
-def get_page_card_list_by_tag_list(page, tag_list):
-     card_list = get_page_card_list(page, cnxn)
-     if len(tag_list) == 1:
-         tag_list.append('')
-     query = f"SELECT * FROM CARD_TAG WHERE CARD IN {tuple(card_list)} AND TAG IN {tuple(tag_list)}"
-     out =  np.asarray(pd.read_sql(query, cnxn)['CARD'].unique())
-     return out
- 
- 
-def get_cards_df_by_card_list(card_list):
-    if len(card_list) in [0,1]:
-        card_list = list(card_list)
-        card_list.append('')
-    query = f"SELECT * FROM CARDS WHERE TITLE IN {tuple(card_list)}"
-    out =  pd.read_sql(query, cnxn)
-    return out
-
-#------------------------------------------------------------------
- #App initialization
-
-
-FONT_AWESOME = "https://use.fontawesome.com/releases/v5.7.2/css/all.css"
+meta_tags = [
+    {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1, maximum-scale=1",
+    }]
 
 app = dash.Dash(
     __name__,
-    #requests_pathname_prefix="/Bio/",
+    external_stylesheets=external_stylesheets,
+    external_scripts=external_scripts,
+    meta_tags=meta_tags)
 
-            meta_tags=[
-                {"name": "viewport", "content": "width=device-width, initial-scale=1"}
-            ],
-            external_stylesheets=[dbc.themes.FLATLY, FONT_AWESOME],
-      )
+app.title = "Machines Do Learn"
 
-#----------------------------------------------------------------
-# Navbar
+server = app.server
 
-#TODO: Need to check if the navbar can collapse after clicking
+#---------------------------------------------------------------------------------
+def About():
+    about = html.Div([
+        html.Div([
+            html.H4(
+                "Abhimanyu",
+                className="font-xl bold letter_spac8 default_inverse"
+            ),
+            html.Div([
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                                about_data['para1'], 
+                                html.Br(), 
+                                html.Br(),
+                                about_data['para2']
+                            ],
+                            className="font-sm",
+                        )
+                    ], lg=12, sm=12),
+                ]),
+            ], className="about_content padding32")
+        ], className="terciary_bg radius8 relative about")
+    ], className="padding16")
+    return about
+#---------------------------------------------------------------------------------
+def Stacks():
+    stacks = html.Div([
+        dtc.Carousel([
+            html.Div(
+                html.Img(alt=i['name'], src=i['image']),
+                className="item padding16 margin16 radius8 white_bg"
+            ) for i in stacks_data
+        ],
+            slides_to_scroll=1,
+            swipe_to_slide=True,
+            autoplay=True,
+            speed=2000,
+            variable_width=True,
+            center_mode=True,
+            responsive=[
+            {
+                'breakpoint': 991,
+                'settings': {
+                    'arrows': False
+                }
+            }
+        ])
+    ], className="stacks padding16")
 
-navbar = dbc.NavbarSimple(
-    children=[
-        dbc.NavItem(dbc.NavLink("Home", href="Home")),
-        dbc.NavItem(dbc.NavLink("Skills", href="Skills")),
-        dbc.NavItem(dbc.NavLink("Experience", href="Experience")),
-        dbc.NavItem(dbc.NavLink("Cetifications", href="Certifications")),
-        dbc.NavItem(dbc.NavLink("Projects", href="Projects")),
-        dbc.NavItem(dbc.NavLink("Demos", href="Demos")),
-        dbc.NavItem(dbc.NavLink("Publications", href="Publications")),
-        dbc.NavItem(dbc.NavLink("Resources", href="Resources")),
-        dbc.NavItem(dbc.NavLink("Contact", href="Contact")),
+    return stacks
+#---------------------------------------------------------------------------------
+def Card(image, title, description, link, badge, git):
 
-    ],
-        
-    brand="Machines Do Learn",
-    brand_href="home",
-    color="primary",
-    dark=True,
-    sticky='top',
-    fluid=True,
-)
-
-#---------------------------------------------------------------
-# Main app footer
-
-#TODO: Need to fix allignment of the icons make them centered
-
-app_footer =  dbc.Row(
+    card = dbc.Col(
+        html.Div([
+            html.A(
+                html.Div(
+                    html.Img(src=image, alt=title),
+                    className="bottom16 portfolio_card_img"),
+                href=link, target="_blank"
+            ),
+            html.Div([
+                html.H4(title, className="font-sm bold uppercase"),
+                html.P(description, className="font-xs"),
+            ], className="portfolio_card_text bottom16"),
+            html.Div([
+                html.Div([
+                    html.Div(
+                        dbc.Badge(
+                            i, className="mr-1 self_center default_inverse primary_bg"),
+                        className="inline-block"
+                    ) for i in badge
+                ]),
+                html.A(
+                    html.I(className="fab fa-github font-sm terciary"),
+                    href=git, target="_blank"),
+            ], className="font-xs flex_row_btw portfolio_card_footer")
+        ], className="second_bg padding16 radius8 portfolio_card"),
+        className="padding16", lg=4, md=6, sm=6, xs=12
+    )
+    return card
+#---------------------------------------------------------------------------------
+def Footer():
+    app_footer =  dbc.Row(
             [
                 dbc.NavLink(href="https://www.linkedin.com/in/yadav-abhimanyu/", children=[html.I(className="fab fa-linkedin-in")]),
                 dbc.NavLink(href="https://github.com/abhimanyu-yadav-1985", children=[html.I(className="fab fa-github")]),
                 dbc.NavLink(href="https://yadav-manyu.medium.com/", children=[html.I(className="fab fa-medium")])
-            ], align="center")
+            ])
 
-#---------------------------------------------------------------
-# main app layout
+    footer = html.Div(
+        html.Div(
+            dbc.Row([
+                dbc.Col([
+                    html.Div(
+                        'Contact', className="uppercase bold font-xs padding4"),
+                    html.Div(
+                        html.A(
+                            'yadav.manyu@gmail.com',
+                            href="mailto:yadav.manyu@gmail.com",
+                            target="_blank"
+                        ), className="padding4"),
+                ], lg=12, width=12),
+                app_footer
+            ], className="padding16"),
+            className="terciary_bg radius8"),
+        className="padding32 default_inverse footer font-sm")
 
+    return footer
+#---------------------------------------------------------------------------------
+def NavBar():
+    navbar = dbc.NavbarSimple(
+        children=[
+            dbc.NavItem(dbc.NavLink("Home", href="Home")),
+            dbc.NavItem(dbc.NavLink("Projects", href="Projects")),
+            dbc.NavItem(dbc.NavLink("Articles", href="Articles")),
+        ],
+            
+        brand="Machines Do Learn",
+        brand_href="home",
+        color="primary",
+        dark=True,
+        sticky='top',
+        fluid=True)
+    return navbar
+#---------------------------------------------------------------------------------
 app.layout= html.Div(
     [
         dcc.Location(id='url', refresh=False),
-        navbar,
+        NavBar(),
+        html.Br(),
+        html.Br(),
         html.Br(),
         html.Div(id='page-content'),
         html.Hr(),
-        app_footer
-    ]
-)
+        Footer()
+    ])
+#---------------------------------------------------------------------------------
+def make_cards(card_list):
+    portfolio = html.Div([
+        dbc.Row([
+            Card(i['image'], i['title'], i['description'], i['link'], i['badges'], i['git']) for i in card_list
+        ], className="portfolio")
+    ])
+    return portfolio
 
-#-------------------------------------------------------------
-#TODO: ability to handle video cards
-def make_card(title, header, description, footer, img, className, link_1_text, link_1, link_2_text, link_2, medium):
-    children = []
-    if header != 'NA':
-        children.append(dbc.CardHeader(header))
-    if img != 'NA':
-        children.append(dbc.CardImg(src=img, top=True))
+def make_home_page():
+    portfolio_cards = []
+    for card in card_data:
+        if card['feature'] == 1:
+            portfolio_cards.append(card)
+            
+    featured = make_cards(portfolio_cards)
     
-    children_cbody = []
-    children_cbody.append(html.H4(title, className="card-title"))
-    if description !='NA':
-        children_cbody.append(html.P(description, className="card-text"))
-        
-    if link_1_text != 'NA':
-        children_cbody.append(dbc.CardLink(link_1_text, href=link_1))
+    body = dbc.Container(
+        [
+            About(),
+            Stacks(),
+            featured,
+        ], className="top32")
+
+    return body
+
+def make_porfolio_page(page):
+    portfolio_cards = []
+    for card in card_data:
+        if card['page'] == page:
+            portfolio_cards.append(card)
+            
+    featured = make_cards(portfolio_cards)
     
-    if link_2_text!='NA':
-        children_cbody.append(dbc.CardLink(link_2_text, href=link_2))
-        
-    children.append(dbc.CardBody(children=children_cbody))
+    body = dbc.Container(
+        [
+            dbc.Row(
+            [
+             html.H4(page)
+            ], justify="center", align="center", className="h-50"
+            ),
+            html.Hr(),
+            featured,
+        ], className="top32")
+
+    return body
     
-    if footer!='NA':
-        children.append(dbc.CardFooter(footer))
-        
-    card = dbc.Card(children=children, className = className)
-    
-    return card
-
-
-def make_card_list(cards_df):
-    card_list = []
-    for _, row in cards_df.iterrows():
-        title = row.TITLE
-        header = row.HEADER
-        description = row.DESCRIPTION
-        img = row.IMAGE_NAME
-        footer = row.FOOTER
-        className = f'card text-black border-{row.STYLE} mb-3'
-        link_1_text = row.LINK_1_NAME
-        link_1 = row.LINK_1
-        link_2_text = row.LINK_2_NAME
-        link_2 = row.LINK_2
-        medium = row.MEDIUM
-        active = row.ACTIVE
-        if active == 'y':
-            card_list.append(make_card(
-                title=title, header=header,
-                footer=footer, img=img,
-                description=description,
-                className=className,
-                link_1_text=link_1_text,
-                link_1=link_1,
-                link_2=link_2,
-                link_2_text = link_2_text,
-                medium=medium))
-    
-    return card_list
-
-
-def get_card_layout(cards_df):
-    return dbc.CardColumns(make_card_list(cards_df))
-
-
-def get_page_content_without_filter(page):
-    card_title_list = get_page_card_list(page)
-    cards_df = get_cards_df_by_card_list(card_title_list)
-    if len(cards_df) == 0:
-        return html.H1('No Card Found')
-    return get_card_layout(cards_df)
-
-
-def get_page_content_with_filter():
-    return html.Div('MaKe Filered page')
-
-def get_home_page():
-    return html.Div('MaKe Home to check')
-
-def get_contact_page():
-    return html.Div('Make Contact')
-
-
-
-pages_with_filter = ['Resources']
-
 def get_page_content(page):
-    page_list = get_page_list()
-    if page in page_list:
-        if page in pages_with_filter:
-            return get_page_content_with_filter(page)
-        else:
-            return get_page_content_without_filter(page)
-    elif page == 'Home':
-        return get_home_page()
-    elif page == 'Contact':
-        return get_contact_page()
+    
+    if page in ['','Home']:
+        return make_home_page()
+    elif page == 'Projects':
+        return make_porfolio_page('Projects')
+    elif page == 'Articles':
+        return make_porfolio_page('Articles')
     else:
         return html.H1('404 Page Not Found')
     
-
 @app.callback(Output('page-content', 'children'),
               Input('url', 'pathname'))
 def display_page(pathname):
     page = pathname.split('/')[1]
     #return get_page_content(page)
     return get_page_content(page)
-    
-if __name__ == '__main__':
-    app.run_server(debug=True, host='0.0.0.0', port='80')
+
+if __name__ == "__main__":
+    app.run_server(debug=True)
