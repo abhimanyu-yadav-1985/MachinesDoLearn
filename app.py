@@ -1,3 +1,7 @@
+#TODO: REmove github icomns when not needed from cards
+#TODO: Remove projects pages and articles pages
+#TODO: Add project and articles heading
+
 import pandas as pd
 
 import dash
